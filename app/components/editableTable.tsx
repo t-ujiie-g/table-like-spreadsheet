@@ -21,6 +21,7 @@ interface handleCellChangeInput {
 export default function EditableTable() {
   const [rows, setRows] = useState(defaultRows);
   const [selectedCell, setSelectedCell] = useState({ row: 0, column: 0 });
+  const [lastSelectedCell, setLastSelectedCell] = useState({ row: 0, column: 0 });
   const [selectionRange, setSelectionRange] = useState({ start: { row: 0, column: 0 }, end: { row: 0, column: 0 } });
   const [sortConfig, setSortConfig] = useState({ key: '', direction: '' });
   const [editingCell, setEditingCell] = useState<{ row: number, column: number } | null>(null);
@@ -94,6 +95,7 @@ export default function EditableTable() {
       setSelectionRange({ ...selectionRange, end: { row: rowIndex, column: columnIndex } });
     } else {
       setSelectedCell({ row: rowIndex, column: columnIndex });
+      setLastSelectedCell({ row: rowIndex, column: columnIndex });
       setSelectionRange({ start: { row: rowIndex, column: columnIndex }, end: { row: rowIndex, column: columnIndex } });
       setEditingCell(null);
     }
@@ -115,7 +117,7 @@ export default function EditableTable() {
     }
   
     if (e.shiftKey) {
-      const { row, column } = selectionRange.end;
+      const { row, column } = lastSelectedCell;
       let newRow = row;
       let newColumn = column;
     
@@ -123,38 +125,77 @@ export default function EditableTable() {
         e.preventDefault(); // デフォルトのブラウザ動作を防ぐ
         if (e.key === 'ArrowUp') {
           newRow = 0;
+          setLastSelectedCell({ row: newRow, column: newColumn });
           setSelectionRange({ start: { row: newRow, column: selectionRange.start.column }, end: { row: selectionRange.end.row, column: selectionRange.end.column } });
         }
         if (e.key === 'ArrowDown') {
           newRow = rows.length - 1;
+          setLastSelectedCell({ row: newRow, column: newColumn });
           setSelectionRange({ start: { row: selectionRange.start.row, column: selectionRange.start.column }, end: { row: newRow, column: selectionRange.end.column } });
         }
         if (e.key === 'ArrowLeft') {
           newColumn = 0;
+          setLastSelectedCell({ row: newRow, column: newColumn });
           setSelectionRange({ start: { row: selectionRange.start.row, column: newColumn }, end: { row: selectionRange.end.row, column: selectionRange.end.column } });
         }
         if (e.key === 'ArrowRight') {
           newColumn = 2;
+          setLastSelectedCell({ row: newRow, column: newColumn });
           setSelectionRange({ start: { row: selectionRange.start.row, column: selectionRange.start.column }, end: { row: selectionRange.end.row, column: newColumn } });
         }
       } else {
-        if (e.key === 'ArrowUp') newRow = Math.max(row - 1, 0);
-        if (e.key === 'ArrowDown') newRow = Math.min(row + 1, rows.length - 1);
-        if (e.key === 'ArrowLeft') newColumn = Math.max(column - 1, 0);
-        if (e.key === 'ArrowRight') newColumn = Math.min(column + 1, 2);
-    
-        if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-          const { row: startRow, column: startColumn } = selectionRange.start;
-          if (e.key === 'ArrowUp') {
-            newRow = Math.max(startRow - 1, 0);
-            setSelectionRange({ start: { row: newRow, column: selectionRange.start.column }, end: { row: selectionRange.end.row, column: selectionRange.end.column } });
+        const { row: startRow, column: startColumn } = selectionRange.start;
+        const { row: endRow, column: endColumn} = selectionRange.end;
+        let newRowStart = newRow;
+        let newRowEnd = newRow;
+        let newColumnStart = newColumn;
+        let newColumnEnd = newColumn;
+        if (e.key === 'ArrowUp') {
+          newRow = Math.max(row - 1, 0);
+          if (lastSelectedCell.row > startRow) {
+            newRowStart = startRow;
+            newRowEnd = Math.min(newRow, endRow);
+          } else {
+            newRowStart = Math.min(newRow, startRow);
+            newRowEnd = Math.max(newRow, endRow);
           }
-          if (e.key === 'ArrowLeft') {
-            newColumn = Math.max(startColumn - 1, 0);
-            setSelectionRange({ start: { row: selectionRange.start.row, column: newColumn }, end: { row: selectionRange.end.row, column: selectionRange.end.column } });
+          setLastSelectedCell({ row: newRow, column: newColumn });
+          setSelectionRange({ start: { row: newRowStart, column: startColumn }, end: { row: newRowEnd, column: endColumn } });
+          console.log({ start: { row: newRowStart, column: newColumn }, end: { row: newRowEnd, column: endColumn } });
+        }
+        if (e.key === 'ArrowDown') {
+          newRow = Math.min(row + 1, rows.length - 1);
+          newRowEnd = Math.max(newRow, endRow);
+          if (lastSelectedCell.row < endRow) {
+            newRowStart = Math.max(newRow, startRow);
+          } else {
+            newRowStart = Math.min(newRow, startRow);
           }
-        } else {
-          setSelectionRange({ start: { row: selectionRange.start.row, column: selectionRange.start.column }, end: { row: newRow, column: newColumn } });
+          setLastSelectedCell({ row: newRow, column: newColumn });
+          setSelectionRange({ start: { row: newRowStart, column: startColumn }, end: { row: newRowEnd, column: endColumn } });
+        }
+        if (e.key === 'ArrowLeft') {
+          newColumn = Math.max(column - 1, 0);
+          if (lastSelectedCell.column > startColumn) {
+            newColumnStart = startColumn;
+            newColumnEnd = Math.min(newColumn, endColumn);
+          } else {
+            newColumnStart = Math.min(newColumn, startColumn);
+            newColumnEnd = Math.max(newColumn, endColumn);
+          }
+          setLastSelectedCell({ row: newRow, column: newColumn });
+          setSelectionRange({ start: { row: startRow, column: newColumnStart }, end: { row: endRow, column: newColumnEnd } });
+        }
+        if (e.key === 'ArrowRight') {
+            newColumn = Math.min(column + 1, 2);
+            newColumnEnd = Math.max(newColumn, endColumn);
+            if (lastSelectedCell.column < endColumn) {
+              newColumnStart = Math.max(newColumn, startColumn);
+            } else {
+              newColumnStart = Math.min(newColumn, startColumn);
+            }
+            setLastSelectedCell({ row: newRow, column: newColumn });
+            setSelectionRange({ start: { row: startRow, column: newColumnStart }, end: { row: endRow, column: newColumnEnd } });
         }
       }
     } else if (!e.metaKey && !e.ctrlKey) {
@@ -173,6 +214,7 @@ export default function EditableTable() {
       }
   
       setSelectedCell({ row: newRow, column: newColumn });
+      setLastSelectedCell({ row: newRow, column: newColumn });
       setSelectionRange({ start: { row: newRow, column: newColumn }, end: { row: newRow, column: newColumn } });
     } else if (e.metaKey || e.ctrlKey) {
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
@@ -187,6 +229,7 @@ export default function EditableTable() {
         if (e.key === 'ArrowRight') newColumn = 2;
   
         setSelectedCell({ row: newRow, column: newColumn });
+        setLastSelectedCell({ row: newRow, column: newColumn });
         setSelectionRange({ start: { row: newRow, column: newColumn }, end: { row: newRow, column: newColumn } });
       }
     }
@@ -254,7 +297,7 @@ export default function EditableTable() {
         <tbody>
           {rows.map((row, rowIndex) => (
             <tr key={row.id}>
-              <td className={`border px-4 py-2 w-1/3 ${selectionRange.start.row <= rowIndex && rowIndex <= selectionRange.end.row && selectionRange.start.column <= 0 && 0 <= selectionRange.end.column ? 'bg-blue-100' : ''} ${selectedCell.row === rowIndex && selectedCell.column === 0 ? 'bg-blue-100' : ''}`}>
+              <td className={`border px-4 py-2 w-1/3 ${selectionRange.start.row <= rowIndex && rowIndex <= selectionRange.end.row && selectionRange.start.column <= 0 && 0 <= selectionRange.end.column ? 'bg-blue-100' : ''} ${selectedCell.row === rowIndex && selectedCell.column === 0 ? 'bg-blue-100' : ''} `}>
                 {editingCell?.row === rowIndex && editingCell?.column === 0 ? (
                   <input
                     type="date"
@@ -271,7 +314,7 @@ export default function EditableTable() {
                   <div onClick={(e) => handleCellClick(rowIndex, 0, e)}>{row.date}</div>
                 )}
               </td>
-              <td className={`border px-4 py-2 w-1/3 ${selectionRange.start.row <= rowIndex && rowIndex <= selectionRange.end.row && selectionRange.start.column <= 1 && 1 <= selectionRange.end.column ? 'bg-blue-100' : ''} ${selectedCell.row === rowIndex && selectedCell.column === 1 ? 'bg-blue-100' : ''}`}>
+              <td className={`border px-4 py-2 w-1/3 ${selectionRange.start.row <= rowIndex && rowIndex <= selectionRange.end.row && selectionRange.start.column <= 1 && 1 <= selectionRange.end.column ? 'bg-blue-100' : ''} ${selectedCell.row === rowIndex && selectedCell.column === 1 ? 'bg-blue-100' : ''} `}>
                 {editingCell?.row === rowIndex && editingCell?.column === 1 ? (
                   <input
                     type="text"
@@ -288,7 +331,7 @@ export default function EditableTable() {
                   <div onClick={(e) => handleCellClick(rowIndex, 1, e)}>{row.title}</div>
                 )}
               </td>
-              <td className={`border px-4 py-2 w-1/3 ${selectionRange.start.row <= rowIndex && rowIndex <= selectionRange.end.row && selectionRange.start.column <= 2 && 2 <= selectionRange.end.column ? 'bg-blue-100' : ''} ${selectedCell.row === rowIndex && selectedCell.column === 2 ? 'bg-blue-100' : ''}`}>
+              <td className={`border px-4 py-2 w-1/3 ${selectionRange.start.row <= rowIndex && rowIndex <= selectionRange.end.row && selectionRange.start.column <= 2 && 2 <= selectionRange.end.column ? 'bg-blue-100' : ''} ${selectedCell.row === rowIndex && selectedCell.column === 2 ? 'bg-blue-100' : ''} `}>
                 {editingCell?.row === rowIndex && editingCell?.column === 2 ? (
                   <input
                     type="number"
